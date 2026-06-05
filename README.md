@@ -24,7 +24,7 @@ gcloud init
 
 ```bash
 gcloud auth login
-gcloud config set project <PROJECT_ID>
+gcloud config set project $PROJECT_ID
 gcloud services enable compute.googleapis.com
 gcloud services enable container.googleapis.com
 gcloud services enable containerregistry.googleapis.com
@@ -39,13 +39,13 @@ gcloud compute instances create practica-creativa \
   --image-family ubuntu-2204-lts \
   --image-project ubuntu-os-cloud \
   --boot-disk-size 50GB \
-  --project <PROJECT_ID>
+  --project $PROJECT_ID
 ```
 
 ### 5. Conectarse a la VM por SSH
 
 ```bash
-gcloud compute ssh practica-creativa --zone us-central1-a --project <PROJECT_ID>
+gcloud compute ssh practica-creativa --zone us-central1-a --project $PROJECT_ID
 ```
 
 > A partir de aquí todos los comandos se ejecutan dentro de la VM.
@@ -301,11 +301,19 @@ curl ifconfig.me
 
 > Asume que ya has completado los pasos 1-7 de la Opción A (instalación de requisitos, clonar repo, instalar dependencias Python, descargar datos, compilar JAR y entrenar el modelo).
 
-### 1. Autenticarse en Google Cloud
+### 1. Definir tu PROJECT_ID
+
+Antes de empezar, define tu PROJECT_ID como variable de entorno para usarlo en todos los comandos:
+
+```bash
+export PROJECT_ID=<tu-project-id>
+```
+
+### 2. Autenticarse en Google Cloud
 
 ```bash
 gcloud auth login
-gcloud config set project <PROJECT_ID>
+gcloud config set project $PROJECT_ID
 ```
 
 ### 2. Activar APIs necesarias
@@ -331,7 +339,7 @@ gcloud container clusters create practica-creativa-k8s \
   --zone us-central1-a \
   --num-nodes 2 \
   --machine-type e2-standard-4 \
-  --project <PROJECT_ID>
+  --project $PROJECT_ID
 ```
 
 > Esto tarda ~5 minutos y tiene un coste aproximado de 0.10 USD/hora.
@@ -340,7 +348,7 @@ gcloud container clusters create practica-creativa-k8s \
 
 ```bash
 gcloud container clusters get-credentials practica-creativa-k8s \
-  --zone us-central1-a --project <PROJECT_ID>
+  --zone us-central1-a --project $PROJECT_ID
 ```
 
 ### 6. Construir y subir imágenes a GCR
@@ -348,20 +356,20 @@ gcloud container clusters get-credentials practica-creativa-k8s \
 ```bash
 gcloud auth configure-docker
 
-docker build -t gcr.io/<PROJECT_ID>/flask:latest -f Dockerfile.flask .
-docker push gcr.io/<PROJECT_ID>/flask:latest
+docker build -t gcr.io/$PROJECT_ID/flask:latest -f Dockerfile.flask .
+docker push gcr.io/$PROJECT_ID/flask:latest
 
-docker build -t gcr.io/<PROJECT_ID>/spark-predictor:latest -f Dockerfile.spark .
-docker push gcr.io/<PROJECT_ID>/spark-predictor:latest
+docker build -t gcr.io/$PROJECT_ID/spark-predictor:latest -f Dockerfile.spark .
+docker push gcr.io/$PROJECT_ID/spark-predictor:latest
 
-docker build -t gcr.io/<PROJECT_ID>/kafka:latest -f Dockerfile.kafka .
-docker push gcr.io/<PROJECT_ID>/kafka:latest
+docker build -t gcr.io/$PROJECT_ID/kafka:latest -f Dockerfile.kafka .
+docker push gcr.io/$PROJECT_ID/kafka:latest
 ```
 
 ### 7. Actualizar los manifiestos K8S con tu PROJECT_ID
 
 ```bash
-sed -i 's|gcr.io/practica-creativa-ibdn-496114|gcr.io/<PROJECT_ID>|g' k8s/*.yaml
+sed -i 's|gcr.io/practica-creativa-ibdn-496114|gcr.io/$PROJECT_ID|g' k8s/*.yaml
 ```
 
 ### 8. Desplegar todos los servicios
