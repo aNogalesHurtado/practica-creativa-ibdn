@@ -305,3 +305,29 @@ Dashboards en: Dashboards → Kubernetes / Compute Resources / Namespace (Pods) 
 - ✅ Punto 5: Dockerización completa con Docker-compose
 - ✅ Punto 6: Despliegue en Kubernetes (GKE) con Spark en modo distribuido
 - ✅ Mejoras: Observabilidad con Prometheus + Grafana
+
+---
+
+## Descarga de datos y modelos
+
+Antes de arrancar la práctica hay que descargar los datos y entrenar el modelo:
+
+### 1. Descargar datos originales
+
+```bash
+cd practica-creativa-ibdn
+bash resources/download_data.sh
+```
+
+Esto descarga en `data/`:
+- `simple_flight_delay_features.jsonl.bz2` — datos de vuelos
+- `origin_dest_distances.jsonl` — distancias entre aeropuertos
+
+### 2. Entrenar el modelo con Spark
+
+```bash
+source env/bin/activate
+spark-submit resources/train_spark_mllib_model.py .
+```
+
+Los modelos se guardan en `models/`. A partir de aquí sigue las instrucciones de despliegue con Docker-compose o K8S.
