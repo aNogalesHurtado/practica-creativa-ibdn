@@ -269,7 +269,19 @@ curl ifconfig.me
 - kubectl
 - Cluster GKE creado (2 nodos e2-standard-4, us-central1-a)
 
-### 1. Crear el cluster GKE
+### 1. Crear un proyecto en GCloud
+
+Ve a https://console.cloud.google.com/ y crea un nuevo proyecto. Anota el ID del proyecto (PROJECT_ID).
+
+Luego activa la facturación y habilita las APIs necesarias:
+
+```bash
+gcloud config set project <PROJECT_ID>
+gcloud services enable container.googleapis.com
+gcloud services enable containerregistry.googleapis.com
+```
+
+### 2. Crear el cluster GKE
 
 ```bash
 gcloud container clusters create practica-creativa-k8s \
