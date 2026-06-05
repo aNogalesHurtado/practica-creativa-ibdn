@@ -331,3 +331,58 @@ spark-submit resources/train_spark_mllib_model.py .
 ```
 
 Los modelos se guardan en `models/`. A partir de aquí sigue las instrucciones de despliegue con Docker-compose o K8S.
+
+---
+
+## Instalación de requisitos (Ubuntu)
+
+### Docker y Docker Compose
+
+```bash
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+### Java 17 y SBT
+
+```bash
+sudo apt-get install -y openjdk-17-jdk
+echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' >> ~/.bashrc
+source ~/.bashrc
+
+echo "deb https://repo.scala-sbt.org/scalasbt/debian all main" | sudo tee /etc/apt/sources.list.d/sbt.list
+curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2DF73499E82A75642AC823" | sudo apt-key add
+sudo apt-get update
+sudo apt-get install -y sbt
+```
+
+### Python 3 y pip
+
+```bash
+sudo apt-get install -y python3 python3-pip python3-venv
+```
+
+### Git
+
+```bash
+sudo apt-get install -y git
+```
+
+### Spark 4.1.1
+
+```bash
+curl -LO https://archive.apache.org/dist/spark/spark-4.1.1/spark-4.1.1-bin-hadoop3.tgz
+tar -xzf spark-4.1.1-bin-hadoop3.tgz
+sudo mv spark-4.1.1-bin-hadoop3 /opt/spark
+echo 'export SPARK_HOME=/opt/spark' >> ~/.bashrc
+echo 'export PATH=$PATH:$SPARK_HOME/bin' >> ~/.bashrc
+source ~/.bashrc
+```
