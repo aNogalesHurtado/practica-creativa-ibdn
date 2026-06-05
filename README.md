@@ -109,7 +109,7 @@ Los modelos se guardan en `models/`.
 ## 7. Despliegue con Docker-compose
 
 ```bash
-docker compose up
+docker-compose up
 ```
 
 Arranca automáticamente: MongoDB, MinIO, Cassandra, Kafka, Spark Master, Spark Worker, Spark Predictor y Flask. Espera ~3 minutos.
