@@ -175,6 +175,8 @@ spark-submit \
 
 ## 10. Crear keyspace y tablas en Cassandra
 
+> **NOTA**: Espera ~60 segundos a que Cassandra arranque completamente antes de ejecutar este paso.
+
 ```bash
 docker exec -it cassandra cqlsh -e "
 CREATE KEYSPACE IF NOT EXISTS agile_data_science
