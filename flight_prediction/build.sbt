@@ -1,12 +1,10 @@
-
-
 name := "flight_prediction"
 
 version := "0.1"
 
-scalaVersion := "2.12.10"
+scalaVersion := "2.13.17"
 
-val sparkVersion = "3.5.3"
+val sparkVersion = "4.1.1"
 
 mainClass in Compile := Some("es.upm.dit.ging.predictor.MakePrediction")
 
@@ -15,12 +13,12 @@ resolvers ++= Seq(
 )
 
 libraryDependencies ++= Seq(
-  "org.apache.spark" %% "spark-core" % sparkVersion,
-  "org.apache.spark" %% "spark-sql" % sparkVersion,
-  "org.apache.spark" %% "spark-mllib" % sparkVersion,
-  "org.apache.spark" %% "spark-streaming" % sparkVersion,
-  "org.apache.spark" %% "spark-hive" % sparkVersion,
-  "org.apache.spark" %% "spark-sql-kafka-0-10" % sparkVersion,
-  "org.mongodb.spark" %% "mongo-spark-connector" % "10.4.1"
-
+  "org.apache.spark" %% "spark-core" % sparkVersion % "provided",
+  "org.apache.spark" %% "spark-sql" % sparkVersion % "provided",
+  "org.apache.spark" %% "spark-mllib" % sparkVersion % "provided",
+  "org.apache.spark" %% "spark-streaming" % sparkVersion % "provided",
+  "org.apache.spark" %% "spark-hive" % sparkVersion % "provided",
+  "org.apache.spark" %% "spark-sql-kafka-0-10" % sparkVersion % "provided",
+  
+  "org.mongodb" % "mongodb-driver-sync" % "5.1.4"
 )

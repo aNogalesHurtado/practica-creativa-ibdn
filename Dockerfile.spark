@@ -1,0 +1,18 @@
+FROM apache/spark:4.1.0
+
+USER root
+
+WORKDIR /app
+
+COPY flight_prediction/target/scala-2.13/flight_prediction_2.13-0.1.jar /app/flight_prediction.jar
+COPY models/ /app/models/
+
+ENV KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+ENV MONGO_HOST=mongo
+ENV PROJECT_HOME=/app
+ENV MODELS_PATH=s3a://lakehouse
+
+COPY k8s/start-spark-predictor.sh /start-spark-predictor.sh
+RUN chmod +x /start-spark-predictor.sh
+
+CMD ["/start-spark-predictor.sh"]

@@ -1,3 +1,5 @@
+import eventlet
+eventlet.monkey_patch()
 import sys, os, re
 from flask import Flask, render_template, request
 from pymongo import MongoClient
@@ -12,7 +14,7 @@ import predict_utils
 # Set up Flask, Mongo and Elasticsearch
 app = Flask(__name__)
 
-client = MongoClient()
+client = MongoClient(config.MONGO_HOST)
 
 from pyelasticsearch import ElasticSearch
 elastic = ElasticSearch(config.ELASTIC_URL)
@@ -25,10 +27,15 @@ import datetime
 
 # Setup Kafka
 from kafka import KafkaProducer
-producer = KafkaProducer(bootstrap_servers=['localhost:9092'],api_version=(0,10))
+producer = KafkaProducer(bootstrap_servers=config.KAFKA_BOOTSTRAP_SERVERS, api_version=(3,7,0))
 PREDICTION_TOPIC = 'flight-delay-ml-request'
 
 import uuid
+from flask_socketio import SocketIO, emit
+import threading
+
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+RESPONSE_TOPIC = 'flight-delay-ml-response'
 
 # Chapter 5 controller: Fetch a flight and display it
 @app.route("/on_time_performance")
@@ -490,7 +497,7 @@ def classify_flight_delays_realtime():
   prediction_features['UUID'] = unique_id
   
   message_bytes = json.dumps(prediction_features).encode()
-  producer.send(PREDICTION_TOPIC, message_bytes)
+  producer.send(PREDICTION_TOPIC, message_bytes).get(timeout=10)
 
   response = {"status": "OK", "id": unique_id}
   return json_util.dumps(response)
@@ -537,9 +544,47 @@ def shutdown():
   shutdown_server()
   return 'Server shutting down...'
 
+def kafka_listener():
+  from kafka import KafkaConsumer
+  from cassandra.cluster import Cluster
+  import json, time
+  consumer = None
+  while consumer is None:
+    try:
+      consumer = KafkaConsumer(
+        'flight-delay-ml-response',
+        bootstrap_servers=config.KAFKA_BOOTSTRAP_SERVERS,
+        auto_offset_reset='latest',
+        value_deserializer=lambda m: json.loads(m.decode('utf-8'))
+      )
+    except Exception as e:
+      print("Kafka not ready, retrying in 5s:", e)
+      time.sleep(5)
+  cass_cluster = Cluster([os.environ.get('CASSANDRA_HOST', '127.0.0.1')])
+  cass_session = cass_cluster.connect('agile_data_science')
+  for message in consumer:
+    prediction = message.value
+    try:
+      cass_session.execute("""
+        INSERT INTO flight_delay_ml_response
+        (uuid, origin, dest, carrier, depdelay, prediction, timestamp, flightdate, dayofweek, dayofyear, dayofmonth, distance, route)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+      """, (
+        prediction.get('UUID'), prediction.get('Origin'), prediction.get('Dest'),
+        prediction.get('Carrier'), prediction.get('DepDelay'), prediction.get('Prediction'),
+        prediction.get('Timestamp'), prediction.get('FlightDate'), prediction.get('DayOfWeek'),
+        prediction.get('DayOfYear'), prediction.get('DayOfMonth'), prediction.get('Distance'),
+        prediction.get('Route')
+      ))
+    except Exception as e:
+      print("Cassandra insert error:", e)
+    socketio.emit('prediction', prediction)
+
+@socketio.on('connect')
+def handle_connect():
+  print('Client connected via websocket')
+
 if __name__ == "__main__":
-    app.run(
-    debug=True,
-    host='0.0.0.0',
-    port='5001'
-  )
+    t = threading.Thread(target=kafka_listener, daemon=True)
+    t.start()
+    socketio.run(app, debug=True, host='0.0.0.0', port=5001)

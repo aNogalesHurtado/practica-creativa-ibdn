@@ -53,9 +53,15 @@ def main(base_path):
     StructField("Origin", StringType(), True),      # "Origin":"TUS"
   ])
   
-  input_path = "{}/data/simple_flight_delay_features.jsonl.bz2".format(
-    base_path
-  )
+  # Read from MinIO using S3 protocol
+  spark.conf.set("spark.hadoop.fs.s3a.endpoint", "http://127.0.0.1:9000")
+  spark.conf.set("spark.hadoop.fs.s3a.access.key", "admin")
+  spark.conf.set("spark.hadoop.fs.s3a.secret.key", "admin123")
+  spark.conf.set("spark.hadoop.fs.s3a.path.style.access", "true")
+  spark.conf.set("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+  spark.conf.set("spark.hadoop.fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider")
+
+  input_path = "s3a://lakehouse/data/simple_flight_delay_features.jsonl.bz2"
   features = spark.read.json(input_path, schema=schema)
   features.first()
   
@@ -94,7 +100,7 @@ def main(base_path):
   )
   
   # Save the bucketizer
-  arrival_bucketizer_path = "{}/models/arrival_bucketizer_2.0.bin".format(base_path)
+  arrival_bucketizer_path = "s3a://lakehouse/models/arrival_bucketizer_2.0.bin"
   arrival_bucketizer.write().overwrite().save(arrival_bucketizer_path)
   
   # Apply the bucketizer
@@ -120,10 +126,7 @@ def main(base_path):
     ml_bucketized_features = ml_bucketized_features.drop(column)
     
     # Save the pipeline model
-    string_indexer_output_path = "{}/models/string_indexer_model_{}.bin".format(
-      base_path,
-      column
-    )
+    string_indexer_output_path = "s3a://lakehouse/models/string_indexer_model_{}.bin".format(column)
     string_indexer_model.write().overwrite().save(string_indexer_output_path)
   
   # Combine continuous, numeric fields with indexes of nominal ones
@@ -141,7 +144,7 @@ def main(base_path):
   final_vectorized_features = vector_assembler.transform(ml_bucketized_features)
   
   # Save the numeric vector assembler
-  vector_assembler_path = "{}/models/numeric_vector_assembler.bin".format(base_path)
+  vector_assembler_path = "s3a://lakehouse/models/numeric_vector_assembler.bin"
   vector_assembler.write().overwrite().save(vector_assembler_path)
   
   # Drop the index columns
@@ -163,9 +166,7 @@ def main(base_path):
   model = rfc.fit(final_vectorized_features)
   
   # Save the new model over the old one
-  model_output_path = "{}/models/spark_random_forest_classifier.flight_delays.5.0.bin".format(
-    base_path
-  )
+  model_output_path = "s3a://lakehouse/models/spark_random_forest_classifier.flight_delays.5.0.bin"
   model.write().overwrite().save(model_output_path)
   
   # Evaluate model using test data

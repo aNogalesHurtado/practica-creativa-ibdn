@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spark-predictor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spark-predictor
+  template:
+    metadata:
+      labels:
+        app: spark-predictor
+    spec:
+      enableServiceLinks: false
+      securityContext:
+        runAsUser: 0
+      containers:
+      - name: spark-predictor
+        image: gcr.io/practica-creativa-ibdn-496114/spark-predictor:latest
+        env:
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: "kafka:9092"
+        - name: MONGO_HOST
+          value: "mongo"
+        - name: CASSANDRA_HOST
+          value: "cassandra"
+        - name: PROJECT_HOME
+          value: "/app"
+        - name: MODELS_PATH
+          value: "s3a://lakehouse"
+        - name: SPARK_LOCAL_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: spark-predictor-svc
+spec:
+  clusterIP: None
+  selector:
+    app: spark-predictor
+  ports:
+  - port: 4040
+    targetPort: 4040

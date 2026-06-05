@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spark-master
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spark-master
+  template:
+    metadata:
+      labels:
+        app: spark-master
+    spec:
+      securityContext:
+        runAsUser: 0
+      enableServiceLinks: false
+      containers:
+      - name: spark-master
+        image: apache/spark:4.1.0
+        command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.master.Master"]
+        env:
+        - name: SPARK_MASTER_HOST
+          value: "0.0.0.0"
+        - name: SPARK_MASTER_PORT
+          value: "7077"
+        - name: SPARK_MASTER_WEBUI_PORT
+          value: "8080"
+        ports:
+        - containerPort: 7077
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: spark-master
+spec:
+  selector:
+    app: spark-master
+  ports:
+  - name: spark
+    port: 7077
+    targetPort: 7077
+  - name: ui
+    port: 8080
+    targetPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: spark-master-ui
+spec:
+  type: LoadBalancer
+  selector:
+    app: spark-master
+  ports:
+  - port: 8080
+    targetPort: 8080
