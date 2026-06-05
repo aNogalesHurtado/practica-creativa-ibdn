@@ -117,11 +117,11 @@ spark-submit \
   resources/train_spark_mllib_model.py .
 ```
 
-Los modelos se guardan directamente en MinIO en `s3a://lakehouse/models/`.
+Los modelos MLlib se guardan directamente en MinIO en `s3a://lakehouse/models/`.
 
 ---
 
-## 8. Subir datos a MinIO
+## 8. Subir datos y modelos sklearn a MinIO
 
 ```bash
 python3 - << 'PYEOF'
@@ -133,6 +133,12 @@ if not client.bucket_exists('lakehouse'):
 client.fput_object('lakehouse', 'data/simple_flight_delay_features.jsonl.bz2',
                    'data/simple_flight_delay_features.jsonl.bz2')
 print('Datos subidos')
+for root, dirs, files in os.walk('models'):
+    for file in files:
+        local_path = os.path.join(root, file)
+        client.fput_object('lakehouse', local_path, local_path)
+        print(f'Subido: {local_path}')
+print('Todo subido')
 PYEOF
 ```
 
