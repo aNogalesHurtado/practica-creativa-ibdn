@@ -269,7 +269,19 @@ curl ifconfig.me
 - kubectl
 - Cluster GKE creado (2 nodos e2-standard-4, us-central1-a)
 
-### 1. Autenticarse y conectar kubectl
+### 1. Crear el cluster GKE
+
+```bash
+gcloud container clusters create practica-creativa-k8s \
+  --zone us-central1-a \
+  --num-nodes 2 \
+  --machine-type e2-standard-4 \
+  --project <PROJECT_ID>
+```
+
+> **NOTA**: Esto tarda ~5 minutos. Sustituye `<PROJECT_ID>` por el tuyo.
+
+### 2. Autenticarse y conectar kubectl
 
 ```bash
 gcloud auth login --no-launch-browser
