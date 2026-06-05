@@ -24,3 +24,7 @@ joblib
 minio
 findspark
 numpy
+minio
+cassandra-driver
+findspark
+numpy
