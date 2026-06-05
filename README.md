@@ -4,6 +4,56 @@ Predicción de retrasos de vuelos en tiempo real usando Spark, Kafka, Cassandra,
 
 ---
 
+## 0. Crear cuenta de Google Cloud y VM
+
+### 1. Crear cuenta y proyecto
+
+1. Ve a https://console.cloud.google.com/ y crea una cuenta
+2. Activa la facturación en https://console.cloud.google.com/billing
+3. Crea un nuevo proyecto y anota el PROJECT_ID
+
+### 2. Instalar Google Cloud SDK
+
+```bash
+curl https://sdk.cloud.google.com | bash
+exec -l $SHELL
+gcloud init
+```
+
+### 3. Habilitar APIs necesarias
+
+```bash
+gcloud auth login
+gcloud config set project <PROJECT_ID>
+gcloud services enable compute.googleapis.com
+gcloud services enable container.googleapis.com
+gcloud services enable containerregistry.googleapis.com
+```
+
+### 4. Crear la VM
+
+```bash
+gcloud compute instances create practica-creativa \
+  --zone us-central1-a \
+  --machine-type e2-standard-4 \
+  --image-family ubuntu-2204-lts \
+  --image-project ubuntu-os-cloud \
+  --boot-disk-size 50GB \
+  --project <PROJECT_ID>
+```
+
+### 5. Conectarse a la VM por SSH
+
+```bash
+gcloud compute ssh practica-creativa --zone us-central1-a --project <PROJECT_ID>
+```
+
+> A partir de aquí todos los comandos se ejecutan dentro de la VM.
+
+---
+
+## OPCIÓN A — Despliegue con Docker-compose
+
 ## 1. Instalación de requisitos (Ubuntu)
 
 ### Docker y Docker Compose
@@ -162,7 +212,6 @@ PYEOF
 ## 10. Crear Iceberg en MinIO (dos pasos separados)
 
 ```bash
-# Paso 1: crear el fichero
 cat > /tmp/create_iceberg.py << 'EOF'
 from pyspark.sql import SparkSession
 spark = SparkSession.builder.appName('CreateIceberg').getOrCreate()
@@ -174,7 +223,6 @@ EOF
 ```
 
 ```bash
-# Paso 2: ejecutar
 spark-submit \
   --packages org.apache.hadoop:hadoop-aws:3.4.0,com.amazonaws:aws-java-sdk-bundle:1.12.262 \
   --conf spark.hadoop.fs.s3a.endpoint=http://127.0.0.1:9000 \
@@ -246,21 +294,6 @@ curl ifconfig.me
 - **Predicción**: http://\<IP\>:5001/flights/delays/predict_kafka
 - **Spark Master UI**: http://\<IP\>:8080
 - **MinIO**: http://\<IP\>:9001 (admin/admin123)
-
----
-
-## Puntos implementados
-
-- ✅ Punto 1: Data Lakehouse en MinIO con Iceberg
-- ✅ Punto 2: Distancias entre aeropuertos en Cassandra
-- ✅ Punto 3: Predicciones en tiempo real con Kafka + WebSockets + Cassandra
-- ✅ Punto 4: Entrenamiento con Spark MLlib leyendo y guardando en MinIO
-- ✅ Punto 5: Dockerización completa con Docker-compose
-- ✅ Punto 6: Despliegue en Kubernetes (GKE) con Spark distribuido
-- ✅ Mejoras: Observabilidad con Prometheus + Grafana
-
----
-
 
 ---
 
