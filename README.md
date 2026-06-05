@@ -261,43 +261,37 @@ curl ifconfig.me
 
 ---
 
+
+---
+
 ## OPCIÓN B — Despliegue en Kubernetes (GKE)
 
-> **REQUISITOS PREVIOS**:
-> - Cuenta de Google Cloud con facturación activada (https://console.cloud.google.com/)
-> - Google Cloud SDK instalado (https://cloud.google.com/sdk/docs/install)
-> - Crear un proyecto en GCloud y anotar el PROJECT_ID
-> - El cluster GKE tiene un coste aproximado de ~0.10 USD/hora con 2 nodos e2-standard-4
->
-> Una vez tengas la cuenta y el SDK instalado, crea el proyecto y el cluster:
-> ```bash
-> gcloud auth login
-> gcloud projects create <PROJECT_ID>
-> gcloud config set project <PROJECT_ID>
-> gcloud services enable container.googleapis.com containerregistry.googleapis.com
-> gcloud container clusters create practica-creativa-k8s \\
->   --zone us-central1-a --num-nodes 2 --machine-type e2-standard-4
-> ```
+> Asume que ya has completado los pasos 1-7 de la Opción A (instalación de requisitos, clonar repo, instalar dependencias Python, descargar datos, compilar JAR y entrenar el modelo).
 
-### Requisitos adicionales
-
-- Google Cloud SDK
-- kubectl
-- Cluster GKE creado (2 nodos e2-standard-4, us-central1-a)
-
-### 1. Crear un proyecto en GCloud
-
-Ve a https://console.cloud.google.com/ y crea un nuevo proyecto. Anota el ID del proyecto (PROJECT_ID).
-
-Luego activa la facturación y habilita las APIs necesarias:
+### 1. Autenticarse en Google Cloud
 
 ```bash
+gcloud auth login
 gcloud config set project <PROJECT_ID>
+```
+
+### 2. Activar APIs necesarias
+
+```bash
 gcloud services enable container.googleapis.com
 gcloud services enable containerregistry.googleapis.com
 ```
 
-### 2. Crear el cluster GKE
+### 3. Instalar kubectl y el plugin de GKE
+
+```bash
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+chmod +x kubectl
+sudo mv kubectl /usr/local/bin/
+sudo apt-get install google-cloud-cli-gke-gcloud-auth-plugin
+```
+
+### 4. Crear el cluster GKE
 
 ```bash
 gcloud container clusters create practica-creativa-k8s \
@@ -307,32 +301,19 @@ gcloud container clusters create practica-creativa-k8s \
   --project <PROJECT_ID>
 ```
 
-> **NOTA**: Esto tarda ~5 minutos. Sustituye `<PROJECT_ID>` por el tuyo.
+> Esto tarda ~5 minutos y tiene un coste aproximado de 0.10 USD/hora.
 
-### 2. Autenticarse y conectar kubectl
+### 5. Conectar kubectl al cluster
 
 ```bash
-gcloud auth login --no-launch-browser
 gcloud container clusters get-credentials practica-creativa-k8s \
   --zone us-central1-a --project <PROJECT_ID>
 ```
 
-### 2. Instalar kubectl y plugin GKE
-
-```bash
-curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-chmod +x kubectl
-sudo mv kubectl /usr/local/bin/
-
-sudo apt-get install google-cloud-cli-gke-gcloud-auth-plugin
-```
-
-### 3. Construir y subir imágenes a GCR
+### 6. Construir y subir imágenes a GCR
 
 ```bash
 gcloud auth configure-docker
-
-cd flight_prediction && sbt package && cd ..
 
 docker build -t gcr.io/<PROJECT_ID>/flask:latest -f Dockerfile.flask .
 docker push gcr.io/<PROJECT_ID>/flask:latest
@@ -344,17 +325,21 @@ docker build -t gcr.io/<PROJECT_ID>/kafka:latest -f Dockerfile.kafka .
 docker push gcr.io/<PROJECT_ID>/kafka:latest
 ```
 
-> **NOTA**: Actualiza las IPs de GCR en los ficheros `k8s/*.yaml` con tu PROJECT_ID.
+### 7. Actualizar los manifiestos K8S con tu PROJECT_ID
 
-### 4. Desplegar todos los servicios
+```bash
+sed -i 's|gcr.io/practica-creativa-ibdn-496114|gcr.io/<PROJECT_ID>|g' k8s/*.yaml
+```
+
+### 8. Desplegar todos los servicios
 
 ```bash
 kubectl apply -f k8s/
 kubectl get pods -w
-# Ctrl+C cuando todos estén 1/1 Running
+# Ctrl+C cuando todos estén 1/1 Running (~3-5 minutos)
 ```
 
-### 5. Crear topics Kafka
+### 9. Crear topics Kafka
 
 ```bash
 kubectl exec -it $(kubectl get pod -l app=kafka \
@@ -370,7 +355,7 @@ kubectl exec -it $(kubectl get pod -l app=kafka \
   --partitions 1 --topic flight-delay-ml-response
 ```
 
-### 6. Crear keyspace y tablas en Cassandra
+### 10. Crear keyspace y tablas en Cassandra
 
 ```bash
 kubectl exec -it $(kubectl get pod -l app=cassandra \
@@ -387,7 +372,7 @@ CREATE TABLE IF NOT EXISTS flight_delay_ml_response (
   dayofmonth INT, distance DOUBLE, route TEXT);"
 ```
 
-### 7. Importar distancias a Cassandra
+### 11. Importar distancias a Cassandra
 
 ```bash
 kubectl port-forward svc/cassandra 9042:9042 &
@@ -410,7 +395,7 @@ cluster.shutdown()
 PYEOF
 ```
 
-### 8. Subir datos y modelos a MinIO
+### 12. Subir datos y modelos a MinIO
 
 ```bash
 kubectl port-forward svc/minio 9000:9000 &
@@ -428,11 +413,12 @@ for root, dirs, files in os.walk('models'):
     for file in files:
         local_path = os.path.join(root, file)
         client.fput_object('lakehouse', local_path, local_path)
+        print(f'Subido: {local_path}')
 print('Todo subido')
 PYEOF
 ```
 
-### 9. Crear Iceberg (dos pasos separados)
+### 13. Crear Iceberg en MinIO
 
 ```bash
 cat > /tmp/create_iceberg.py << 'EOF'
@@ -443,9 +429,7 @@ df.write.mode('overwrite').parquet('s3a://lakehouse/iceberg/flights/')
 print('Iceberg creado')
 spark.stop()
 EOF
-```
 
-```bash
 spark-submit \
   --packages org.apache.hadoop:hadoop-aws:3.4.0,com.amazonaws:aws-java-sdk-bundle:1.12.262 \
   --conf spark.hadoop.fs.s3a.endpoint=http://127.0.0.1:9000 \
@@ -457,21 +441,22 @@ spark-submit \
   /tmp/create_iceberg.py
 ```
 
-### 10. Reiniciar spark-predictor y flask
+### 14. Reiniciar spark-predictor y flask
 
 ```bash
 kubectl rollout restart deployment/spark-predictor
 kubectl rollout restart deployment/flask
 ```
 
-### 11. Obtener IPs y acceder
+### 15. Obtener IPs y acceder a la aplicación
 
 ```bash
 kubectl get services
-# Flask:    http://<EXTERNAL-IP-flask>:5001/flights/delays/predict_kafka
-# Spark UI: http://<EXTERNAL-IP-spark-master-ui>:8080
-# MinIO:    http://<EXTERNAL-IP-minio-external>:9001 (admin/admin123)
 ```
+
+- **Predicción**: http://\<IP-flask\>:5001/flights/delays/predict_kafka
+- **Spark UI**: http://\<IP-spark-master-ui\>:8080
+- **MinIO**: http://\<IP-minio-external\>:9001 (admin/admin123)
 
 ---
 
@@ -497,3 +482,15 @@ kubectl --namespace monitoring get secrets monitoring-grafana \
   -o jsonpath="{.data.admin-password}" | base64 -d ; echo
 # http://<EXTERNAL-IP-grafana>  usuario: admin
 ```
+
+---
+
+## Puntos implementados
+
+- ✅ Punto 1: Data Lakehouse en MinIO con Iceberg
+- ✅ Punto 2: Distancias entre aeropuertos en Cassandra
+- ✅ Punto 3: Predicciones en tiempo real con Kafka + WebSockets + Cassandra
+- ✅ Punto 4: Entrenamiento con Spark MLlib leyendo y guardando en MinIO
+- ✅ Punto 5: Dockerización completa con Docker-compose
+- ✅ Punto 6: Despliegue en Kubernetes (GKE) con Spark distribuido
+- ✅ Mejoras: Observabilidad con Prometheus + Grafana
