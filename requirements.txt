@@ -16,7 +16,6 @@ selenium
 scikit-learn
 tabulate
 tldextract
-wikipedia
 findspark
 iso8601
 urllib3==1.24
