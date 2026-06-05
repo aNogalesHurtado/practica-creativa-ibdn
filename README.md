@@ -263,6 +263,22 @@ curl ifconfig.me
 
 ## OPCIÓN B — Despliegue en Kubernetes (GKE)
 
+> **REQUISITOS PREVIOS**:
+> - Cuenta de Google Cloud con facturación activada (https://console.cloud.google.com/)
+> - Google Cloud SDK instalado (https://cloud.google.com/sdk/docs/install)
+> - Crear un proyecto en GCloud y anotar el PROJECT_ID
+> - El cluster GKE tiene un coste aproximado de ~0.10 USD/hora con 2 nodos e2-standard-4
+>
+> Una vez tengas la cuenta y el SDK instalado, crea el proyecto y el cluster:
+> ```bash
+> gcloud auth login
+> gcloud projects create <PROJECT_ID>
+> gcloud config set project <PROJECT_ID>
+> gcloud services enable container.googleapis.com containerregistry.googleapis.com
+> gcloud container clusters create practica-creativa-k8s \\
+>   --zone us-central1-a --num-nodes 2 --machine-type e2-standard-4
+> ```
+
 ### Requisitos adicionales
 
 - Google Cloud SDK
