@@ -15,7 +15,7 @@ sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyring
 sudo chmod a+r /etc/apt/keyrings/docker.asc
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 sudo apt-get update
-sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin docker-compose
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose
 sudo usermod -aG docker $USER
 newgrp docker
 ```
@@ -69,7 +69,6 @@ cd practica-creativa-ibdn
 python3 -m venv env
 source env/bin/activate
 pip install -r requirements.txt
-pip install minio cassandra-driver
 ```
 
 ---
@@ -98,13 +97,11 @@ cd ..
 docker-compose up
 ```
 
-> **NOTA**: El spark-predictor fallará inicialmente porque MinIO aún no tiene los modelos. Esto es normal. Continúa con los pasos siguientes y luego reinícialo.
+> **NOTA**: El spark-predictor fallará inicialmente porque MinIO aún no tiene los modelos. Continúa con los siguientes pasos en una nueva terminal.
 
 ---
 
-## 7. Entrenar el modelo
-
-En una nueva terminal:
+## 7. Entrenar el modelo (nueva terminal)
 
 ```bash
 source env/bin/activate
@@ -120,11 +117,11 @@ spark-submit \
   resources/train_spark_mllib_model.py .
 ```
 
-Los modelos se guardan en `models/`.
+Los modelos se guardan directamente en MinIO en `s3a://lakehouse/models/`.
 
 ---
 
-## 8. Subir datos y modelos a MinIO
+## 8. Subir datos a MinIO
 
 ```bash
 python3 - << 'PYEOF'
@@ -136,12 +133,6 @@ if not client.bucket_exists('lakehouse'):
 client.fput_object('lakehouse', 'data/simple_flight_delay_features.jsonl.bz2',
                    'data/simple_flight_delay_features.jsonl.bz2')
 print('Datos subidos')
-for root, dirs, files in os.walk('models'):
-    for file in files:
-        local_path = os.path.join(root, file)
-        client.fput_object('lakehouse', local_path, local_path)
-        print(f'Subido: {local_path}')
-print('Todo subido')
 PYEOF
 ```
 
@@ -223,10 +214,9 @@ docker-compose restart spark-predictor flask
 
 ---
 
-## 13. Acceder a la aplicación
+## 13. Obtener IP y acceder a la aplicación
 
 ```bash
-# Obtener la IP de la máquina
 curl ifconfig.me
 ```
 
