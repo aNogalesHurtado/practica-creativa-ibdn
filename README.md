@@ -2,33 +2,68 @@
 
 Predicción de retrasos de vuelos en tiempo real usando Spark, Kafka, Cassandra, MongoDB, MinIO y Flask.
 
-## Requisitos previos
+---
 
-- Docker y Docker Compose
-- Java 17 y SBT (para compilar el JAR de Scala)
-- Python 3.11
-- Git
+## 1. Instalación de requisitos (Ubuntu)
+
+### Docker y Docker Compose
+```bash
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+### Java 17 y SBT
+```bash
+sudo apt-get install -y openjdk-17-jdk
+echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' >> ~/.bashrc
+source ~/.bashrc
+
+echo "deb https://repo.scala-sbt.org/scalasbt/debian all main" | sudo tee /etc/apt/sources.list.d/sbt.list
+curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2DF73499E82A75642AC823" | sudo apt-key add
+sudo apt-get update
+sudo apt-get install -y sbt
+```
+
+### Python 3
+```bash
+sudo apt-get install -y python3 python3-pip python3-venv
+```
+
+### Spark 4.1.1
+```bash
+curl -LO https://archive.apache.org/dist/spark/spark-4.1.1/spark-4.1.1-bin-hadoop3.tgz
+tar -xzf spark-4.1.1-bin-hadoop3.tgz
+sudo mv spark-4.1.1-bin-hadoop3 /opt/spark
+echo 'export SPARK_HOME=/opt/spark' >> ~/.bashrc
+echo 'export PATH=$PATH:$SPARK_HOME/bin' >> ~/.bashrc
+source ~/.bashrc
+```
+
+### Git
+```bash
+sudo apt-get install -y git
+```
 
 ---
 
-## Despliegue con Docker-compose
-
-### 1. Clonar el repositorio
+## 2. Clonar el repositorio
 
 ```bash
 git clone https://github.com/aNogalesHurtado/practica-creativa-ibdn.git
 cd practica-creativa-ibdn
 ```
 
-### 2. Compilar el JAR de Spark
+---
 
-```bash
-cd flight_prediction
-sbt package
-cd ..
-```
-
-### 3. Crear entorno Python e instalar dependencias
+## 3. Instalar dependencias Python
 
 ```bash
 python3 -m venv env
@@ -36,15 +71,50 @@ source env/bin/activate
 pip install -r requirements.txt
 ```
 
-### 4. Arrancar todos los servicios
+---
+
+## 4. Descargar datos
 
 ```bash
-docker-compose up
+bash resources/download_data.sh
 ```
 
-Esto arranca automáticamente: MongoDB, MinIO, Cassandra, Kafka, Spark Master, Spark Worker, Spark Predictor y Flask. Espera ~3 minutos a que todos los servicios estén listos.
+Descarga en `data/`:
+- `simple_flight_delay_features.jsonl.bz2`
+- `origin_dest_distances.jsonl`
 
-### 5. Subir datos y modelos a MinIO
+---
+
+## 5. Compilar el JAR de Spark
+
+```bash
+cd flight_prediction
+sbt package
+cd ..
+```
+
+---
+
+## 6. Entrenar el modelo
+
+```bash
+source env/bin/activate
+spark-submit resources/train_spark_mllib_model.py .
+```
+
+Los modelos se guardan en `models/`.
+
+---
+
+## 7. Despliegue con Docker-compose
+
+```bash
+docker compose up
+```
+
+Arranca automáticamente: MongoDB, MinIO, Cassandra, Kafka, Spark Master, Spark Worker, Spark Predictor y Flask. Espera ~3 minutos.
+
+### Subir datos y modelos a MinIO
 
 En una nueva terminal:
 
@@ -67,7 +137,7 @@ print('Todo subido')
 PYEOF
 ```
 
-### 6. Crear Iceberg en MinIO (dos pasos separados)
+### Crear Iceberg en MinIO (dos pasos separados)
 
 ```bash
 # Paso 1: crear el fichero
@@ -92,7 +162,7 @@ spark-submit \
   /tmp/create_iceberg.py
 ```
 
-### 7. Acceder a la aplicación
+### Acceder a la aplicación
 
 - **Predicción**: http://localhost:5001/flights/delays/predict_kafka
 - **Spark Master UI**: http://localhost:8080
@@ -100,19 +170,15 @@ spark-submit \
 
 ---
 
-## Despliegue en Kubernetes (GKE)
+## 8. Despliegue en Kubernetes (GKE)
 
-### Requisitos previos adicionales
+### Requisitos adicionales
 
 - Google Cloud SDK
 - kubectl
-- Cluster GKE con 2 nodos e2-standard-4 en us-central1-a
-- Imágenes Docker subidas a GCR:
-  - `gcr.io/<PROJECT_ID>/flask:latest`
-  - `gcr.io/<PROJECT_ID>/spark-predictor:latest`
-  - `gcr.io/<PROJECT_ID>/kafka:latest`
+- Cluster GKE creado (2 nodos e2-standard-4, us-central1-a)
 
-### 1. Autenticarse y conectar kubectl
+### Autenticarse y conectar kubectl
 
 ```bash
 gcloud auth login --no-launch-browser
@@ -120,7 +186,7 @@ gcloud container clusters get-credentials practica-creativa-k8s \
   --zone us-central1-a --project <PROJECT_ID>
 ```
 
-### 2. Construir y subir imágenes a GCR
+### Construir y subir imágenes a GCR
 
 ```bash
 gcloud auth configure-docker
@@ -135,20 +201,15 @@ docker build -t gcr.io/<PROJECT_ID>/kafka:latest -f Dockerfile.kafka .
 docker push gcr.io/<PROJECT_ID>/kafka:latest
 ```
 
-### 3. Desplegar todos los servicios
+### Desplegar todos los servicios
 
 ```bash
 kubectl apply -f k8s/
-```
-
-### 4. Esperar a que todos los pods estén Running
-
-```bash
 kubectl get pods -w
-# Ctrl+C cuando todos estén 1/1 Running (~3-5 min)
+# Ctrl+C cuando todos estén 1/1 Running
 ```
 
-### 5. Crear topics Kafka
+### Crear topics Kafka
 
 ```bash
 kubectl exec -it $(kubectl get pod -l app=kafka \
@@ -164,7 +225,7 @@ kubectl exec -it $(kubectl get pod -l app=kafka \
   --partitions 1 --topic flight-delay-ml-response
 ```
 
-### 6. Crear keyspace y tablas en Cassandra
+### Crear keyspace y tablas en Cassandra
 
 ```bash
 kubectl exec -it $(kubectl get pod -l app=cassandra \
@@ -181,7 +242,7 @@ CREATE TABLE IF NOT EXISTS flight_delay_ml_response (
   dayofmonth INT, distance DOUBLE, route TEXT);"
 ```
 
-### 7. Importar distancias a Cassandra
+### Importar distancias a Cassandra
 
 ```bash
 kubectl port-forward svc/cassandra 9042:9042 &
@@ -204,7 +265,7 @@ cluster.shutdown()
 PYEOF
 ```
 
-### 8. Subir datos y modelos a MinIO
+### Subir datos y modelos a MinIO
 
 ```bash
 kubectl port-forward svc/minio 9000:9000 &
@@ -226,10 +287,9 @@ print('Todo subido')
 PYEOF
 ```
 
-### 9. Crear Iceberg en MinIO (dos pasos separados)
+### Crear Iceberg (dos pasos separados)
 
 ```bash
-# Paso 1
 cat > /tmp/create_iceberg.py << 'EOF'
 from pyspark.sql import SparkSession
 spark = SparkSession.builder.appName('CreateIceberg').getOrCreate()
@@ -239,7 +299,6 @@ print('Iceberg creado')
 spark.stop()
 EOF
 
-# Paso 2 (port-forward de MinIO debe seguir activo)
 spark-submit \
   --packages org.apache.hadoop:hadoop-aws:3.4.0,com.amazonaws:aws-java-sdk-bundle:1.12.262 \
   --conf spark.hadoop.fs.s3a.endpoint=http://127.0.0.1:9000 \
@@ -251,14 +310,14 @@ spark-submit \
   /tmp/create_iceberg.py
 ```
 
-### 10. Reiniciar spark-predictor y flask
+### Reiniciar spark-predictor y flask
 
 ```bash
 kubectl rollout restart deployment/spark-predictor
 kubectl rollout restart deployment/flask
 ```
 
-### 11. Obtener IPs y acceder
+### Obtener IPs y acceder
 
 ```bash
 kubectl get services
@@ -269,9 +328,9 @@ kubectl get services
 
 ---
 
-## Observabilidad — Prometheus + Grafana
+## 9. Observabilidad — Prometheus + Grafana (K8S)
 
-### Instalación (solo primera vez)
+### Instalación
 
 ```bash
 curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
@@ -287,12 +346,10 @@ helm install monitoring prometheus-community/kube-prometheus-stack \
 
 ```bash
 kubectl --namespace monitoring get services | grep grafana
-# http://<EXTERNAL-IP-grafana>  usuario: admin
 kubectl --namespace monitoring get secrets monitoring-grafana \
   -o jsonpath="{.data.admin-password}" | base64 -d ; echo
+# http://<EXTERNAL-IP-grafana>  usuario: admin
 ```
-
-Dashboards en: Dashboards → Kubernetes / Compute Resources / Namespace (Pods) → namespace: default
 
 ---
 
@@ -303,86 +360,5 @@ Dashboards en: Dashboards → Kubernetes / Compute Resources / Namespace (Pods) 
 - ✅ Punto 3: Predicciones en tiempo real con Kafka + WebSockets + Cassandra
 - ✅ Punto 4: Entrenamiento con Spark MLlib leyendo y guardando en MinIO
 - ✅ Punto 5: Dockerización completa con Docker-compose
-- ✅ Punto 6: Despliegue en Kubernetes (GKE) con Spark en modo distribuido
+- ✅ Punto 6: Despliegue en Kubernetes (GKE) con Spark distribuido
 - ✅ Mejoras: Observabilidad con Prometheus + Grafana
-
----
-
-## Descarga de datos y modelos
-
-Antes de arrancar la práctica hay que descargar los datos y entrenar el modelo:
-
-### 1. Descargar datos originales
-
-```bash
-cd practica-creativa-ibdn
-bash resources/download_data.sh
-```
-
-Esto descarga en `data/`:
-- `simple_flight_delay_features.jsonl.bz2` — datos de vuelos
-- `origin_dest_distances.jsonl` — distancias entre aeropuertos
-
-### 2. Entrenar el modelo con Spark
-
-```bash
-source env/bin/activate
-spark-submit resources/train_spark_mllib_model.py .
-```
-
-Los modelos se guardan en `models/`. A partir de aquí sigue las instrucciones de despliegue con Docker-compose o K8S.
-
----
-
-## Instalación de requisitos (Ubuntu)
-
-### Docker y Docker Compose
-
-```bash
-sudo apt-get update
-sudo apt-get install -y ca-certificates curl
-sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-sudo chmod a+r /etc/apt/keyrings/docker.asc
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo apt-get update
-sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-sudo usermod -aG docker $USER
-newgrp docker
-```
-
-### Java 17 y SBT
-
-```bash
-sudo apt-get install -y openjdk-17-jdk
-echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' >> ~/.bashrc
-source ~/.bashrc
-
-echo "deb https://repo.scala-sbt.org/scalasbt/debian all main" | sudo tee /etc/apt/sources.list.d/sbt.list
-curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2DF73499E82A75642AC823" | sudo apt-key add
-sudo apt-get update
-sudo apt-get install -y sbt
-```
-
-### Python 3 y pip
-
-```bash
-sudo apt-get install -y python3 python3-pip python3-venv
-```
-
-### Git
-
-```bash
-sudo apt-get install -y git
-```
-
-### Spark 4.1.1
-
-```bash
-curl -LO https://archive.apache.org/dist/spark/spark-4.1.1/spark-4.1.1-bin-hadoop3.tgz
-tar -xzf spark-4.1.1-bin-hadoop3.tgz
-sudo mv spark-4.1.1-bin-hadoop3 /opt/spark
-echo 'export SPARK_HOME=/opt/spark' >> ~/.bashrc
-echo 'export PATH=$PATH:$SPARK_HOME/bin' >> ~/.bashrc
-source ~/.bashrc
-```
