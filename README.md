@@ -144,7 +144,22 @@ PYEOF
 
 ---
 
-## 9. Crear Iceberg en MinIO (dos pasos separados)
+## 9. Verificar que los modelos están en MinIO (debe devolver 28)
+
+```bash
+python3 - << 'PYEOF'
+from minio import Minio
+client = Minio('127.0.0.1:9000', access_key='admin', secret_key='admin123', secure=False)
+objects = list(client.list_objects('lakehouse', prefix='models/', recursive=True))
+print(f"Modelos en MinIO: {len(objects)}")
+assert len(objects) >= 20, "ERROR: faltan modelos en MinIO. Repite el paso 7."
+print("OK - modelos verificados")
+PYEOF
+```
+
+---
+
+## 10. Crear Iceberg en MinIO (dos pasos separados)
 
 ```bash
 # Paso 1: crear el fichero
@@ -173,7 +188,7 @@ spark-submit \
 
 ---
 
-## 10. Crear keyspace y tablas en Cassandra
+## 11. Crear keyspace y tablas en Cassandra
 
 > **NOTA**: Espera ~60 segundos a que Cassandra arranque completamente antes de ejecutar este paso.
 
@@ -193,7 +208,7 @@ CREATE TABLE IF NOT EXISTS flight_delay_ml_response (
 
 ---
 
-## 11. Importar distancias a Cassandra
+## 12. Importar distancias a Cassandra
 
 ```bash
 python3 - << 'PYEOF'
@@ -214,7 +229,7 @@ PYEOF
 
 ---
 
-## 12. Reiniciar spark-predictor y flask
+## 13. Reiniciar spark-predictor y flask
 
 ```bash
 docker-compose restart spark-predictor flask
@@ -222,7 +237,7 @@ docker-compose restart spark-predictor flask
 
 ---
 
-## 13. Obtener IP y acceder a la aplicación
+## 14. Obtener IP y acceder a la aplicación
 
 ```bash
 curl ifconfig.me
